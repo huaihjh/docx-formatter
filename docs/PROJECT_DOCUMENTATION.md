@@ -226,8 +226,8 @@ services/
 
 ## 9. 已知问题与风险
 
-1. Label taxonomy status
-- Confirmed: `table_cell` is `location_type`, not `semantic_label`.
+1. 标签口径状态
+- 已确认：`table_cell` 属于 `location_type`，不属于 `semantic_label`。
 
 2. 复杂文档中的泛化仍需增强
 - 深层嵌套编号、手工排版异常、混合样式可能导致置信度不稳。
@@ -240,8 +240,8 @@ services/
 
 ## 10. 下一阶段建议（按优先级）
 
-1. Keep label taxonomy consistent
-- Keep `semantic_label` and `location_type` wording aligned in README, code, and reports.
+1. 保持标签口径一致
+- 持续保持 README、代码与识别报告中 `semantic_label` 与 `location_type` 的表述一致。
 
 2. 提升可配置性
 - 在 UI 增加“是否启用真实拆段”“拆段仅限表格/全文”等开关。
@@ -269,3 +269,4 @@ services/
 ## 12. 当前结论
 
 项目核心难点已从“格式参数解析”转为“结构识别准确率与可解释性”。当前代码已经具备通用识别框架与诊断闭环，下一步应围绕样本回归和策略稳定性做工程化完善。
+
