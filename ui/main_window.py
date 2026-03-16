@@ -22,9 +22,13 @@ from PySide6.QtWidgets import (
 )
 
 from models.structure import AnalyzerConfig
-from services.diagnostic_reporter import DiagnosticReporter
+from services.diagnostic_reporter import (
+    DiagnosticReporter,
+    ReportBuildError,
+    ReportWriteError,
+)
 from services.docx_reader import DocxReader
-from services.exporter import Exporter
+from services.exporter import ExportError, Exporter
 from services.formatter import Formatter
 from services.rule_parser import RuleParseError, RuleParser
 from services.structure_analyzer import StructureAnalyzer
@@ -202,7 +206,12 @@ class MainWindow(QMainWindow):
             output_path = Exporter.save(doc, path_obj)
 
             report_path = output_path.with_name(f"{output_path.stem}_识别报告.json")
-            report_payload = DiagnosticReporter.build_report(analysis, applied_map)
+            report_payload = DiagnosticReporter.build_report(
+                analysis,
+                applied_map,
+                source_path=path_obj,
+                output_path=output_path,
+            )
             DiagnosticReporter.write_json(report_path, report_payload)
 
             self.result_output.setText(str(output_path))

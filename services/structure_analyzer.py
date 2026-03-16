@@ -24,7 +24,9 @@ class StructureAnalyzer:
     DATE_PREFIX_RE = re.compile(
         r"^(?:\d{4}[./-]\d{1,2}(?:[./-]\d{1,2})?|\d{1,2}月\d{1,2}日|\d{1,2}[-~至]\d{1,2}月)"
     )
-    CAPTION_RE = re.compile(r"^(?:图|表|Figure|Table)\s*\d+(?:[.-]\d+)*")
+    CAPTION_RE = re.compile(
+        r"^[\[\u3010\(\uff08]?\s*(?:\u56fe|\u8868|Figure|Table)\s*\d+(?:[.-]\d+)*(?:\s*[\uff1a:]|\s*[\]\u3011\)\uff09])?"
+    )
     SENTENCE_PUNCT_RE = re.compile(r"[，。；！？?!]")
     CN_CHAR_RE = re.compile(r"[\u4e00-\u9fff]")
 
@@ -534,13 +536,19 @@ class StructureAnalyzer:
             return True
         if cls.DATE_PREFIX_RE.match(s):
             return True
-        if re.match(r"^[-*•]\s+", s):
+        if re.match(r"^[-*\u2022]\s+", s):
             return True
-        if re.match(r"^\d+[.)、]\S", s):
+        # Simple numbered list items: 1. xxx / 1) xxx / 1\u3001xxx
+        # Multi-level numbering like 1.1 / 1.1.1 is handled as sub-headings.
+        if re.match(r"^\d+[\)\u3001]\S", s):
             return True
-        if re.match(r"^\d+[.)、]\s+", s):
+        if re.match(r"^\d+[\)\u3001]\s+", s):
             return True
-        if re.match(r"^[（(]\d+[）)]", s):
+        if re.match(r"^\d+\.(?!\d)\S", s):
+            return True
+        if re.match(r"^\d+\.(?!\d)\s+", s):
+            return True
+        if re.match(r"^[\uff08(]\d+[\uff09)]", s):
             return True
         return False
 
