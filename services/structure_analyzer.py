@@ -392,6 +392,11 @@ class StructureAnalyzer:
             scores["inline_subheading"] += 1.8
             reasons.append("ends_with_colon:+1.8 inline_subheading")
 
+        if f.ends_with_colon and f.has_sub_numbering:
+            scores["sub_heading"] += 0.6
+            reasons.append("sub_numbering_with_colon:+0.6 sub_heading")
+
+
         if f.alignment == "center" and f.text_length <= 40:
             scores["main_heading"] += 1.2
             reasons.append("center_short:+1.2 main_heading")
@@ -439,6 +444,10 @@ class StructureAnalyzer:
 
         if f.text_length <= 24:
             scores["sub_heading"] += 0.4
+
+        if f.has_sub_numbering and abs(scores["sub_heading"] - scores["body"]) <= 0.4:
+            scores["sub_heading"] += 0.8
+            reasons.append("sub_numbering_tie_break:+0.8 sub_heading")
 
         if block.location_type == "table_cell":
             scores["main_heading"] -= 0.6

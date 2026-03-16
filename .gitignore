@@ -23,3 +23,12 @@ Thumbs.db
 AGENTS.md
 skills/
 memory-bank/
+# Sample corpus (large binary files)
+samples/**/*.docx
+samples/**/*.doc
+samples/**/*.pdf
+samples/**/*.json
+
+# Keep sample structure docs/placeholders
+!samples/**/README.md
+!samples/**/.gitkeep
