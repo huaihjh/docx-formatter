@@ -1,0 +1,25 @@
+﻿# Python cache and bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+
+# IDE/editor
+.vscode/
+.idea/
+
+# Local temp artifacts
+tmp/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Codex/local collaboration artifacts (not app source)
+AGENTS.md
+skills/
+memory-bank/

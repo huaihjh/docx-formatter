@@ -18,15 +18,17 @@
   - 表格单元格段落（含嵌套表格）
   - 软换行拆分后的行
   - 行内“前缀+正文”拆分后的子块
-- 分类标签：
+- 语义标签（`semantic_label`）：
   - `main_heading`
   - `sub_heading`
   - `inline_subheading`
   - `body`
   - `list_item`
-  - `table_cell`
   - `caption`
   - `unknown`
+- 位置标签（`location_type`）：
+  - `paragraph`
+  - `table_cell`
 
 ## 特征（示例）
 每个逻辑块会提取：
@@ -47,12 +49,12 @@
 - `services/formatter.py`：仅按分类结果套格式，不做临时识别判断
 
 ## 规则应用策略
+- `location_type == table_cell`：优先使用表格规则 `rule.table`
 - `main_heading` / `sub_heading`：标题规则
 - `inline_subheading`：行内小标题规则
 - `body`：正文规则
 - `list_item`：列表规则
 - `caption`：图表说明规则
-- `table_cell`：表格规则
 - `unknown`：默认不改
 
 ## 诊断报告

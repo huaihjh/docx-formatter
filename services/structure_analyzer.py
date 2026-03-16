@@ -442,6 +442,10 @@ class StructureAnalyzer:
             scores["main_heading"] -= 0.6
             scores["sub_heading"] -= 0.4
             scores["body"] += 0.3
+            # Table cells are often short status/name fragments; prefer body unless
+            # there is explicit numbering/list/caption evidence.
+            if not f.list_item_like and not f.caption_like and not f.has_main_numbering and not f.has_sub_numbering:
+                scores["body"] += 1.1
 
         ranked = sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
         best_label, best_score = ranked[0]

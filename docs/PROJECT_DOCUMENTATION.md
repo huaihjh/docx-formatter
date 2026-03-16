@@ -226,8 +226,8 @@ services/
 
 ## 9. 已知问题与风险
 
-1. 分类集合与文档期望尚有差异
-- 需求曾提出 `table_cell` 作为语义类，当前实现将其作为位置类。
+1. Label taxonomy status
+- Confirmed: `table_cell` is `location_type`, not `semantic_label`.
 
 2. 复杂文档中的泛化仍需增强
 - 深层嵌套编号、手工排版异常、混合样式可能导致置信度不稳。
@@ -240,8 +240,8 @@ services/
 
 ## 10. 下一阶段建议（按优先级）
 
-1. 统一分类设计
-- 明确 `semantic_label` 与 `location_type` 的最终规范，保持全链路一致。
+1. Keep label taxonomy consistent
+- Keep `semantic_label` and `location_type` wording aligned in README, code, and reports.
 
 2. 提升可配置性
 - 在 UI 增加“是否启用真实拆段”“拆段仅限表格/全文”等开关。
