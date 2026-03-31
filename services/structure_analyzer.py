@@ -27,12 +27,14 @@ class StructureAnalyzer:
     CAPTION_RE = re.compile(
         r"^[\[\u3010\(\uff08]?\s*(?:\u56fe|\u8868|Figure|Table)\s*\d+(?:[.-]\d+)*(?:\s*[\uff1a:]|\s*[\]\u3011\)\uff09])?"
     )
+    BRACKET_WRAPPED_RE = re.compile(r"^[\[\u3010\(\uff08].*[\]\u3011\)\uff09]$")
     SENTENCE_PUNCT_RE = re.compile(r"[，。；！？?!]")
     CN_CHAR_RE = re.compile(r"[\u4e00-\u9fff]")
 
     SEMANTIC_LABELS = [
         "main_heading",
         "sub_heading",
+        "table_header",
         "inline_subheading",
         "body",
         "list_item",
@@ -396,7 +398,6 @@ class StructureAnalyzer:
             scores["sub_heading"] += 0.6
             reasons.append("sub_numbering_with_colon:+0.6 sub_heading")
 
-
         if f.alignment == "center" and f.text_length <= 40:
             scores["main_heading"] += 1.2
             reasons.append("center_short:+1.2 main_heading")
@@ -408,7 +409,13 @@ class StructureAnalyzer:
         if f.font_size_pt is not None and f.font_size_pt >= 15 and f.text_length <= 50:
             scores["main_heading"] += 0.9
 
-        if f.alignment == "center" and f.bold_ratio >= 0.5 and f.font_size_pt is not None and f.font_size_pt >= 15 and f.text_length <= 50:
+        if (
+            f.alignment == "center"
+            and f.bold_ratio >= 0.5
+            and f.font_size_pt is not None
+            and f.font_size_pt >= 15
+            and f.text_length <= 50
+        ):
             scores["main_heading"] += 0.8
             scores["body"] -= 1.0
 
@@ -449,6 +456,13 @@ class StructureAnalyzer:
             scores["sub_heading"] += 0.8
             reasons.append("sub_numbering_tie_break:+0.8 sub_heading")
 
+        if cls._is_bracket_placeholder(f.clean_text):
+            scores["main_heading"] -= 2.0
+            scores["sub_heading"] -= 1.0
+            scores["caption"] += 0.8
+            scores["body"] += 0.4
+            reasons.append("bracket_placeholder:deboost_heading")
+
         if block.location_type == "table_cell":
             scores["main_heading"] -= 0.6
             scores["sub_heading"] -= 0.4
@@ -457,13 +471,36 @@ class StructureAnalyzer:
             # there is explicit numbering/list/caption evidence.
             if not f.list_item_like and not f.caption_like and not f.has_main_numbering and not f.has_sub_numbering:
                 scores["body"] += 1.1
+            # Explicit numbered heading inside table cell should keep heading signal.
+            if f.has_main_numbering:
+                scores["main_heading"] += 1.2
+                scores["body"] -= 0.4
+            # Top-row short cells are very often table headers.
+            if (
+                block.row_index == 0
+                and not f.caption_like
+                and not f.list_item_like
+                and not f.has_main_numbering
+                and not f.has_sub_numbering
+                and f.text_length <= 16
+                and not f.long_sentence_like
+            ):
+                scores["table_header"] += 3.0
+                scores["main_heading"] -= 0.8
+                reasons.append("table_toprow_short:+3 table_header")
 
         ranked = sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
         best_label, best_score = ranked[0]
         second_score = ranked[1][1]
         margin = best_score - second_score
 
-        strong_non_body = max(scores["main_heading"], scores["sub_heading"], scores["list_item"], scores["caption"])
+        strong_non_body = max(
+            scores["main_heading"],
+            scores["sub_heading"],
+            scores["table_header"],
+            scores["list_item"],
+            scores["caption"],
+        )
         if best_score < cfg.unknown_score_threshold or margin < cfg.unknown_margin_threshold:
             if f.long_sentence_like and not f.caption_like and strong_non_body < scores["body"] + 0.2:
                 best_label = "body"
@@ -479,6 +516,18 @@ class StructureAnalyzer:
 
         confidence = max(0.0, min(1.0, 0.5 + 0.08 * margin + 0.04 * best_score))
         return best_label, scores, reasons, body_match, confidence
+
+    @classmethod
+    def _is_bracket_placeholder(cls, text: str) -> bool:
+        s = cls._clean_text(text)
+        if len(s) < 4 or len(s) > 40:
+            return False
+        if cls.BRACKET_WRAPPED_RE.match(s):
+            return True
+        # Inline split may create right-bracket fragments.
+        if s.endswith(("]", "\u3011", ")", "\uff09")) and ("\u5360\u4f4d" in s or "\u793a\u610f\u56fe" in s):
+            return True
+        return False
 
     @classmethod
     def _body_baseline_match_score(cls, f: BlockFeatures, baseline: DocumentBaseline) -> float:
@@ -653,3 +702,5 @@ class StructureAnalyzer:
             print(f"[StructureDebug] reasons={block.reasons}")
         print(f"[StructureDebug] paragraph_semantic_labels={paragraph_semantic_labels}")
         print("[StructureDebug] ---- end ----")
+
+

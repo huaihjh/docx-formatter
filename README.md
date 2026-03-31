@@ -52,6 +52,12 @@ set DOCX_GENERALIZATION_REPORT_PATH=memory-bank\baseline\generalization_summary.
 python -m unittest tests.test_generalization_suite -v
 ```
 
+One-click script:
+```bash
+scripts\run_generalization.bat
+```
+
+
 `generalization_suite` writes a JSON summary to:
 - default: `memory-bank/baseline/generalization_summary.json`
 - override: `DOCX_GENERALIZATION_REPORT_PATH`

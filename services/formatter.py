@@ -55,7 +55,9 @@ class Formatter:
                 key=key,
                 semantic=semantic,
                 section_rule=section_rule,
-                split_lines=split_targets.get(key),
+                split_plan=split_targets.get(key),
+                location=location,
+                rule=rule,
                 applied=applied,
                 split_applied=split_applied,
                 bold_cleared=bold_cleared,
@@ -81,9 +83,25 @@ class Formatter:
 
     @classmethod
     def _rule_for(cls, semantic: str, location: str, rule: FormatRule) -> SectionRule | None:
-        # 表格单元格统一使用 table 规则，避免被误识别为标题后套用加粗。
+        # Table cells primarily follow table rule, with controlled fallback from body
+        # for common expectations: no-bold and paragraph indent in body/list content.
         if location == "table_cell":
-            return rule.table
+            needs_bold_fallback = rule.table.bold is None and rule.body.bold is not None
+            needs_indent_fallback = (
+                semantic in {"body", "list_item"}
+                and rule.table.first_line_indent is None
+                and rule.body.first_line_indent is not None
+            )
+
+            if not needs_bold_fallback and not needs_indent_fallback:
+                return rule.table
+
+            merged = SectionRule(**rule.table.to_dict())
+            if needs_bold_fallback:
+                merged.bold = rule.body.bold
+            if needs_indent_fallback:
+                merged.first_line_indent = rule.body.first_line_indent
+            return merged
 
         if semantic in {"main_heading", "sub_heading"}:
             return rule.title
@@ -121,7 +139,9 @@ class Formatter:
                         key=key,
                         semantic=semantic,
                         section_rule=section_rule,
-                        split_lines=split_targets.get(key),
+                        split_plan=split_targets.get(key),
+                location=location,
+                rule=rule,
                         applied=applied,
                         split_applied=split_applied,
                         bold_cleared=bold_cleared,
@@ -146,7 +166,9 @@ class Formatter:
         key: str,
         semantic: str,
         section_rule: SectionRule | None,
-        split_lines: list[str] | None,
+        split_plan: list[dict[str, str]] | None,
+        location: str,
+        rule: FormatRule,
         applied: dict[str, str],
         split_applied: dict[str, bool],
         bold_cleared: dict[str, bool],
@@ -158,41 +180,59 @@ class Formatter:
             return
 
         target_paragraphs = [paragraph]
-        if split_lines and len(split_lines) > 1:
-            target_paragraphs = cls._split_paragraph(paragraph, split_lines)
-            split_applied[key] = True
+        if split_plan and len(split_plan) > 1:
+            split_lines = [item.get("text", "").strip() for item in split_plan if item.get("text", "").strip()]
+            if len(split_lines) > 1:
+                target_paragraphs = cls._split_paragraph(paragraph, split_lines)
+                split_applied[key] = True
 
-        for para in target_paragraphs:
-            cleared = cls._apply_paragraph_rule(para, section_rule)
-            bold_cleared[key] = bold_cleared[key] or cleared
+        if split_applied[key] and split_plan:
+            line_semantics = [item.get("semantic", semantic) for item in split_plan if item.get("text", "").strip()]
+            for para, line_semantic in zip(target_paragraphs, line_semantics):
+                line_rule = cls._rule_for(line_semantic, location, rule)
+                if line_rule is None:
+                    continue
+                cleared = cls._apply_paragraph_rule(para, line_rule)
+                bold_cleared[key] = bold_cleared[key] or cleared
+        else:
+            for para in target_paragraphs:
+                cleared = cls._apply_paragraph_rule(para, section_rule)
+                bold_cleared[key] = bold_cleared[key] or cleared
         applied[key] = semantic
 
     @classmethod
-    def _build_split_targets(cls, analysis: StructureAnalysisResult) -> dict[str, list[str]]:
+    def _build_split_targets(cls, analysis: StructureAnalysisResult) -> dict[str, list[dict[str, str]]]:
         grouped: dict[str, list] = defaultdict(list)
         for block in analysis.blocks:
             grouped[block.paragraph_key].append(block)
 
-        targets: dict[str, list[str]] = {}
+        targets: dict[str, list[dict[str, str]]] = {}
         for key, blocks in grouped.items():
             soft_blocks = [b for b in blocks if b.from_soft_break]
             if not soft_blocks:
                 continue
-            if any(b.semantic_label not in {"body", "list_item"} for b in soft_blocks):
-                continue
+
             line_groups: dict[int, list] = defaultdict(list)
             for b in soft_blocks:
                 line_groups[b.line_index].append(b)
             if len(line_groups) <= 1:
                 continue
-            lines: list[str] = []
+
+            plan: list[dict[str, str]] = []
             for line_idx in sorted(line_groups.keys()):
                 segments = sorted(line_groups[line_idx], key=lambda b: b.split_index)
                 line_text = " ".join((seg.raw_text or "").strip() for seg in segments).strip()
-                if line_text:
-                    lines.append(line_text)
-            if len(lines) > 1:
-                targets[key] = lines
+                if not line_text:
+                    continue
+
+                votes: dict[str, float] = {}
+                for seg in segments:
+                    votes[seg.semantic_label] = votes.get(seg.semantic_label, 0.0) + seg.final_confidence
+                line_semantic = max(votes.items(), key=lambda kv: kv[1])[0] if votes else "unknown"
+                plan.append({"text": line_text, "semantic": line_semantic})
+
+            if len(plan) > 1:
+                targets[key] = plan
         return targets
 
     @classmethod

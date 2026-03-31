@@ -30,6 +30,14 @@ class RuleParserTests(unittest.TestCase):
         rule = RuleParser.parse("正文不要加粗")
         self.assertIs(rule.body.bold, False)
 
+    def test_negative_center_phrase_maps_to_left(self) -> None:
+        rule = RuleParser.parse("\u6807\u9898\u9ed1\u4f53\u4e09\u53f7\u4e0d\u5c45\u4e2d")
+        self.assertEqual(rule.title.alignment, "left")
+
+    def test_negative_center_overrides_positive_center(self) -> None:
+        rule = RuleParser.parse("\u6807\u9898\u5c45\u4e2d\u4f46\u4e0d\u5c45\u4e2d")
+        self.assertEqual(rule.title.alignment, "left")
+
 
 if __name__ == "__main__":
     unittest.main()

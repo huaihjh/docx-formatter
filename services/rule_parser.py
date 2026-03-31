@@ -155,12 +155,23 @@ class RuleParser:
 
     @staticmethod
     def _parse_alignment(text: str) -> str | None:
-        if "居中" in text:
-            return "center"
-        if "左对齐" in text:
+        # Negative intent must win over positive keyword match.
+        negative_center_patterns = [
+            "\u4e0d\u5c45\u4e2d",
+            "\u4e0d\u8981\u5c45\u4e2d",
+            "\u4e0d\u9700\u8981\u5c45\u4e2d",
+            "\u53d6\u6d88\u5c45\u4e2d",
+            "\u975e\u5c45\u4e2d",
+        ]
+        if any(p in text for p in negative_center_patterns):
             return "left"
-        if "右对齐" in text:
+
+        if "\u5de6\u5bf9\u9f50" in text:
+            return "left"
+        if "\u53f3\u5bf9\u9f50" in text:
             return "right"
+        if "\u5c45\u4e2d" in text:
+            return "center"
         return None
 
     @staticmethod

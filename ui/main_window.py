@@ -1,12 +1,10 @@
 ﻿from __future__ import annotations
 
-import os
+import json
 from pathlib import Path
 
 from PySide6.QtWidgets import (
-    QCheckBox,
     QComboBox,
-    QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
     QGroupBox,
@@ -17,6 +15,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QPlainTextEdit,
+    QScrollArea,
     QVBoxLayout,
     QWidget,
 )
@@ -49,6 +48,9 @@ class MainWindow(QMainWindow):
         self._setup_ui()
 
     def _setup_ui(self) -> None:
+        scroll = QScrollArea(self)
+        scroll.setWidgetResizable(True)
+
         container = QWidget(self)
         layout = QVBoxLayout(container)
 
@@ -76,7 +78,7 @@ class MainWindow(QMainWindow):
         self.rule_input.setFixedHeight(130)
         layout.addWidget(self.rule_input)
 
-        self._setup_strategy_panel(layout)
+        self._setup_rule_override_panel(layout)
 
         self.btn_run = QPushButton("开始处理")
         self.btn_run.clicked.connect(self.on_process)
@@ -92,58 +94,89 @@ class MainWindow(QMainWindow):
         self.result_output.setReadOnly(True)
         layout.addWidget(self.result_output)
 
-        self.setCentralWidget(container)
+        scroll.setWidget(container)
+        self.setCentralWidget(scroll)
 
-    def _setup_strategy_panel(self, parent_layout: QVBoxLayout) -> None:
-        group = QGroupBox("结构识别策略")
+    def _setup_rule_override_panel(self, parent_layout: QVBoxLayout) -> None:
+        group = QGroupBox("\u89c4\u5219\u89e3\u6790\u9884\u89c8\u4e0e\u8986\u76d6")
         form = QFormLayout(group)
 
-        self.chk_split_soft = QCheckBox("拆分软换行")
-        self.chk_split_soft.setChecked(True)
-        form.addRow(self.chk_split_soft)
+        self.title_align_override = QComboBox()
+        self.title_align_override.addItems(["\u81ea\u52a8(\u4e0d\u8986\u76d6)", "\u5de6\u5bf9\u9f50", "\u5c45\u4e2d", "\u53f3\u5bf9\u9f50"])
+        form.addRow("\u6807\u9898\u5bf9\u9f50\u8986\u76d6", self.title_align_override)
 
-        self.chk_split_inline = QCheckBox("拆分行内小标题")
-        self.chk_split_inline.setChecked(True)
-        form.addRow(self.chk_split_inline)
+        self.title_bold_override = QComboBox()
+        self.title_bold_override.addItems(["\u81ea\u52a8(\u4e0d\u8986\u76d6)", "\u52a0\u7c97", "\u4e0d\u52a0\u7c97"])
+        form.addRow("\u6807\u9898\u52a0\u7c97\u8986\u76d6", self.title_bold_override)
 
-        self.chk_keep_list = QCheckBox("保留列表项整体")
-        self.chk_keep_list.setChecked(True)
-        form.addRow(self.chk_keep_list)
+        self.body_bold_override = QComboBox()
+        self.body_bold_override.addItems(["\u81ea\u52a8(\u4e0d\u8986\u76d6)", "\u52a0\u7c97", "\u4e0d\u52a0\u7c97"])
+        form.addRow("\u6b63\u6587\u52a0\u7c97\u8986\u76d6", self.body_bold_override)
 
-        self.spin_unknown_score = QDoubleSpinBox()
-        self.spin_unknown_score.setRange(0.0, 10.0)
-        self.spin_unknown_score.setSingleStep(0.1)
-        self.spin_unknown_score.setValue(2.0)
-        form.addRow("unknown 最低分阈值", self.spin_unknown_score)
+        self.table_bold_override = QComboBox()
+        self.table_bold_override.addItems(["\u81ea\u52a8(\u4e0d\u8986\u76d6)", "\u52a0\u7c97", "\u4e0d\u52a0\u7c97"])
+        form.addRow("\u8868\u683c\u52a0\u7c97\u8986\u76d6", self.table_bold_override)
 
-        self.spin_unknown_margin = QDoubleSpinBox()
-        self.spin_unknown_margin.setRange(0.0, 5.0)
-        self.spin_unknown_margin.setSingleStep(0.05)
-        self.spin_unknown_margin.setValue(0.35)
-        form.addRow("unknown 分差阈值", self.spin_unknown_margin)
+        self.table_indent_override = QComboBox()
+        self.table_indent_override.addItems(["\u81ea\u52a8(\u4e0d\u8986\u76d6)", "\u7ee7\u627f\u6b63\u6587\u9996\u884c\u7f29\u8fdb", "\u4e0d\u7f29\u8fdb"])
+        form.addRow("\u8868\u683c\u9996\u884c\u7f29\u8fdb\u8986\u76d6", self.table_indent_override)
 
-        self.body_markers_edit = QLineEdit("本,该,通过,针对,为了,其")
-        self.body_markers_edit.setPlaceholderText("逗号分隔，例如：本,该,通过")
-        form.addRow("正文起始词", self.body_markers_edit)
+        self.btn_preview_rule = QPushButton("\u89e3\u6790\u5e76\u9884\u89c8\u89c4\u5219")
+        self.btn_preview_rule.clicked.connect(self.on_preview_rule)
+        form.addRow(self.btn_preview_rule)
 
-        self.chk_debug = QCheckBox("启用结构调试输出")
-        self.chk_debug.setChecked(os.getenv("DOCX_STRUCTURE_DEBUG", "0") == "1")
-        form.addRow(self.chk_debug)
+        self.rule_preview = QPlainTextEdit()
+        self.rule_preview.setReadOnly(True)
+        self.rule_preview.setFixedHeight(140)
+        form.addRow("\u6700\u7ec8\u89c4\u5219\u9884\u89c8(JSON)", self.rule_preview)
 
         parent_layout.addWidget(group)
 
-    def _build_analyzer_config(self) -> AnalyzerConfig:
-        marker_text = self.body_markers_edit.text().strip()
-        markers = tuple(m.strip() for m in marker_text.split(",") if m.strip())
+    @staticmethod
+    def _apply_bold_override(combo_text: str, section_rule) -> None:
+        if combo_text == "\u52a0\u7c97":
+            section_rule.bold = True
+        elif combo_text == "\u4e0d\u52a0\u7c97":
+            section_rule.bold = False
 
-        return AnalyzerConfig(
-            split_soft_breaks=self.chk_split_soft.isChecked(),
-            split_inline_subheading=self.chk_split_inline.isChecked(),
-            keep_list_item_integrity=self.chk_keep_list.isChecked(),
-            unknown_score_threshold=float(self.spin_unknown_score.value()),
-            unknown_margin_threshold=float(self.spin_unknown_margin.value()),
-            body_marker_tokens=markers or AnalyzerConfig().body_marker_tokens,
-        )
+    def _apply_rule_overrides(self, rule) -> None:
+        align_map = {"\u5de6\u5bf9\u9f50": "left", "\u5c45\u4e2d": "center", "\u53f3\u5bf9\u9f50": "right"}
+        title_align = align_map.get(self.title_align_override.currentText())
+        if title_align:
+            rule.title.alignment = title_align
+
+        self._apply_bold_override(self.title_bold_override.currentText(), rule.title)
+        self._apply_bold_override(self.body_bold_override.currentText(), rule.body)
+        self._apply_bold_override(self.table_bold_override.currentText(), rule.table)
+
+        table_indent_text = self.table_indent_override.currentText()
+        if table_indent_text == "\u7ee7\u627f\u6b63\u6587\u9996\u884c\u7f29\u8fdb":
+            if rule.body.first_line_indent is not None:
+                rule.table.first_line_indent = rule.body.first_line_indent
+        elif table_indent_text == "\u4e0d\u7f29\u8fdb":
+            rule.table.first_line_indent = 0.0
+
+    def _build_rule_from_inputs(self, rule_text: str):
+        rule = RuleParser.parse(rule_text)
+        self._apply_rule_overrides(rule)
+        rule.normalize()
+        return rule
+
+    def on_preview_rule(self) -> None:
+        rule_text = self.rule_input.toPlainText().strip()
+        if not rule_text:
+            self._show_error("\u8bf7\u5148\u8f93\u5165\u683c\u5f0f\u8981\u6c42\u6216\u9009\u62e9\u6a21\u677f")
+            return
+
+        try:
+            rule = self._build_rule_from_inputs(rule_text)
+            self.rule_preview.setPlainText(json.dumps(rule.to_dict(), ensure_ascii=False, indent=2))
+            self.log("\u89c4\u5219\u9884\u89c8\u5df2\u66f4\u65b0\uff08\u7ed3\u6784\u5316\u8986\u76d6\u4f18\u5148\u4e8e\u81ea\u7136\u8bed\u8a00\u89e3\u6790\uff09")
+        except RuleParseError as exc:
+            self._show_error(f"\u89c4\u5219\u89e3\u6790\u5931\u8d25: {exc}")
+
+    def _build_analyzer_config(self) -> AnalyzerConfig:
+        return AnalyzerConfig()
 
     def log(self, text: str) -> None:
         self.log_output.appendPlainText(text)
@@ -196,7 +229,7 @@ class MainWindow(QMainWindow):
             cfg = self._build_analyzer_config()
             self.log(f"识别策略: {cfg}")
             self.log("开始结构识别...")
-            analysis = StructureAnalyzer.analyze(doc, config=cfg, debug=self.chk_debug.isChecked())
+            analysis = StructureAnalyzer.analyze(doc, config=cfg, debug=False)
             self.log(f"结构识别完成: {analysis.summary()}")
 
             self.log("开始应用格式...")
@@ -228,3 +261,6 @@ class MainWindow(QMainWindow):
     def _show_error(self, message: str) -> None:
         self.log(message)
         QMessageBox.warning(self, "错误", message)
+
+
+

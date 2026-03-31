@@ -20,6 +20,24 @@ class FormatterTests(unittest.TestCase):
         self.assertIs(Formatter._rule_for("caption", "paragraph", rule), rule.caption)
         self.assertIsNone(Formatter._rule_for("unknown", "paragraph", rule))
 
+    def test_table_rule_inherits_body_bold_when_table_bold_missing(self) -> None:
+        rule = FormatRule(
+            body=SectionRule(bold=False),
+            table=SectionRule(font_name="宋体", font_size=10.5),
+        )
+        section = Formatter._rule_for("main_heading", "table_cell", rule)
+        self.assertIsNotNone(section)
+        self.assertIs(section.bold, False)
+
+    def test_table_body_inherits_body_indent_when_table_indent_missing(self) -> None:
+        rule = FormatRule(
+            body=SectionRule(first_line_indent=2.0),
+            table=SectionRule(font_name="宋体", font_size=10.5),
+        )
+        section = Formatter._rule_for("body", "table_cell", rule)
+        self.assertIsNotNone(section)
+        self.assertEqual(section.first_line_indent, 2.0)
+
 
 if __name__ == "__main__":
     unittest.main()
